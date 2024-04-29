@@ -1,53 +1,34 @@
-import RPi.GPIO as GPIO
+#sudo pip3 install adafruit-circuitpython-dht
+
 import time
+from flask import Flask, render_template
+import RPi.GPIO as GPIO
+import adafruit_dht
+from board import *
 
-OFFSE_DUTY = 0.5 # define pulse offset of servo
-SERVO_MIN_DUTY = 2.5 + OFFSE_DUTY # define the min angle of servo
-SERVO_MAX_DUTY = 12.5 + OFFSE_DUTY # define the max angle of servo
+# GPIO17
+SENSOR_PIN = D17
 
-servoPin = 10
 
-def map(value, fromLow, fromHigh, toLow, toHigh):
-    return (toHigh-toLow)*(value-fromLow)/(fromHigh-fromLow) + toLow
+app = Flask(__name__)
 
-def setup():
- 
-    global p
-    GPIO.setmode(GPIO.BOARD)   #use PHYSICAL GPIO numbering
-    GPIO.setup(servoPin, GPIO.OUT) #set servoPin to OUTPUT mode
-    GPIO.setup(servoPin, GPIO.LOW) #make servoPin output to LOW level
-    p = GPIO.PWM(servoPin, 50) #set Freq to 50Hz
-    p.start(0)                 #set initial duty cycle to 0
+#GPIO.setwarnings(False)
+#GPIO.setmode(GPIO.BCM)
+
+@app.route('/', methods=['GET','POST'])
+def get_data():
     
-def servoWrite(angle):
-    if(angle<0):
-        angle = 0
-    elif(angle > 180):
-        angle = 180
-    p.ChangeDutyCycle(map(angle,0,180,SERVO_MIN_DUTY,SERVO_MAX_DUTY)) #map the angle to duty cycle and output it
-    
+    dht11 = adafruit_dht.DHT11(SENSOR_PIN, use_pulseio=False)
+    temp = dht11.temperature
+    hum = dht11.humidity
+    tempint = int(temp)
+    humint = int(hum)
+    if tempint < 10:
+        datat = "0" + str(tempint)
+    else:
+        datat = str(tempint)
+    datath = datat + "," + str(humint)
+    return(datath)
 
-def loop():
-
-    while True:
-        for dc in range(0, 181, 1):  # make servo rotate from 0 to 180
-            servoWrite(dc)   #write dc value to servo
-            time.sleep(0.001)
-        time.sleep(0.5)
-
-        for dc in range(180, -1, -1): # make the servo rotate from 180 to 0 deg
-           servoWrite(dc)
-            time.sleep(0.001)
-        time.sleep(0.5)
-        
-def destroy():
-    p.stop()
-    GPIO.cleanup()
-    
-if __name__ == '__main__':  # program entrance
-    print('Program is starting...')
-    setup()
-    try:
-        loop()
-    except KeyboardInterrupt: #press ctrl-c to end the program
-        destroy()
+if __name__ == '__main__':
+    app.run(debug=True, port=80, host='0.0.0.0',use_reloader=False)
